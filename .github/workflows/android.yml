@@ -1,123 +1,61 @@
-name: Android CI
+name: Build Android APK
 
 on:
   push:
-  pull_request:
+    tags:
+      - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write   # REQUIRED for GitHub Releases
+
 jobs:
-  BuildRelease:
-    if: github.repository_owner == 'ZalithLauncher' && !startsWith(github.ref, 'refs/pull/') && github.ref_name == 'main'
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        arch: [ "all", "arm", "arm64", "x86", "x86_64" ]
-      fail-fast: false
-
-    env:
-      CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+  build:
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Detect build type
-        id: buildtype
-        run: |
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
-          BUILD_TYPE="debug"
-          PRERELEASE="true"
-
-          if [[ "$COMMIT_MSG" == *"pre-release"* ]]; then
-            BUILD_TYPE="pre-release"
-            PRERELEASE="true"
-          elif [[ "$COMMIT_MSG" == *"release"* ]]; then
-            BUILD_TYPE="release"
-            PRERELEASE="false"
-          fi
-
-          TAG_NAME="v$(date +'%Y.%m.%d.%H%M')"
-
-          echo "BUILD_TYPE=$BUILD_TYPE" >> $GITHUB_ENV
-          echo "PRERELEASE=$PRERELEASE" >> $GITHUB_ENV
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-
-      - name: Set up JDK 17
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: 17
 
-      - name: Build JRE JAR files
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Gradle 8.7
+        run: |
+          wget https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip gradle-8.7-bin.zip
+          echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
+          gradle --version
+
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Build Release APK
         run: |
           chmod +x gradlew
-          mkdir -p out
-          ./gradlew jre_lwjgl3glfw:build --no-daemon
+          ./gradlew assembleRelease
 
-      - name: Build Release ${{ matrix.arch }}
-        env:
-          MOVTERY_KEYSTORE_PASSWORD: ${{ secrets.MOVTERY_KEYSTORE_PASSWORD }}
+      - name: Prepare APK
         run: |
-          chmod +x gradlew
-          ./gradlew KSLauncher:assemblerelease -Darch=${{ matrix.arch }}
+          mkdir -p release
+          cp **/build/outputs/apk/release/*.apk release/KS-Launcher.apk
 
-      - name: Upload Release Artifact ${{ matrix.arch }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: KSLauncher-Release-${{ matrix.arch }}
-          path: KSLauncher/build/outputs/apk/release/*.apk
-
-      - name: Create GitHub Release
-        if: matrix.arch == 'all'
+      - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.TAG_NAME }}
-          name: KS Launcher ${{ env.TAG_NAME }}
-          prerelease: ${{ env.PRERELEASE }}
-          generate_release_notes: true
+          name: "KS Launcher – ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          body: |
+            🚀 KS Launcher Android APK  
+            • Fast  
+            • Lightweight  
+            • Built automatically via GitHub Actions
+          files: release/KS-Launcher.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload APKs to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.TAG_NAME }}
-          files: |
-            KSLauncher/build/outputs/apk/release/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  BuildDebug:
-    if: startsWith(github.ref, 'refs/pull/') || github.ref_name != 'main'
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        arch: [ "all", "arm", "arm64", "x86", "x86_64" ]
-      fail-fast: false
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Build JRE JAR files
-        run: |
-          chmod +x gradlew
-          mkdir -p out
-          ./gradlew jre_lwjgl3glfw:build --no-daemon
-
-      - name: Build Debug ${{ matrix.arch }}
-        run: |
-          chmod +x gradlew
-          ./gradlew KSLauncher:assembleDebug -Darch=${{ matrix.arch }}
-
-      - name: Upload Debug Artifact ${{ matrix.arch }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: KSLauncher-Debug-${{ matrix.arch }}
-          path: KSLauncher/build/outputs/apk/debug/*.apk
