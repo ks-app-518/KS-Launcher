@@ -3,7 +3,7 @@ name: Android CI
 on:
   push:
     tags:
-      - "v*"   # Example: v1.0.0
+      - "v*"
   workflow_dispatch:
 
 jobs:
@@ -22,11 +22,9 @@ jobs:
 
       - name: Grant execute permission
         run: chmod +x gradlew
-        working-directory: kslauncher
 
       - name: Build APK
-        run: ./gradlew assembleRelease
-        working-directory: kslauncher
+        run: ./gradlew :kslauncher:assembleRelease
 
       - name: Upload APK to GitHub Releases
         uses: softprops/action-gh-release@v2
