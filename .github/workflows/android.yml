@@ -26,36 +26,32 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Gradle 8.7
-        run: |
-          wget https://services.gradle.org/distributions/gradle-8.7-bin.zip
-          unzip gradle-8.7-bin.zip
-          echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
-          gradle --version
-
       - name: Accept Android licenses
         run: yes | sdkmanager --licenses
 
+      - name: Make Gradle executable
+        working-directory: kslauncher
+        run: chmod +x gradlew
+
       - name: Build Release APK
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease
+        working-directory: kslauncher
+        run: ./gradlew assembleRelease
 
       - name: Prepare APK
         run: |
           mkdir -p release
-          cp **/build/outputs/apk/release/*.apk release/KS-Launcher.apk
+          cp kslauncher/**/build/outputs/apk/release/*.apk release/KS-Launcher.apk
 
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "KS Launcher – ${{ github.ref_name }}"
           tag_name: ${{ github.ref_name }}
+          name: "KS Launcher – ${{ github.ref_name }}"
           body: |
             🚀 KS Launcher Android APK  
-            • Fast  
-            • Lightweight  
-            • Built automatically via GitHub Actions
+            • Built from kslauncher folder  
+            • Java 17  
+            • Auto release via GitHub Actions
           files: release/KS-Launcher.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
