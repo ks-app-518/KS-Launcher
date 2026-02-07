@@ -1,0 +1,39 @@
+name: Cleanup and Rename Folder
+
+on:
+  workflow_dispatch:   # Manual trigger
+  push:
+    branches:
+      - main           # Change if your branch is different
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete everything except ZalithLauncher
+        run: |
+          shopt -s extglob
+          rm -rf !(ZalithLauncher)
+
+      - name: Rename ZalithLauncher to kslauncher
+        run: |
+          if [ -d "ZalithLauncher" ]; then
+            mv ZalithLauncher kslauncher
+          else
+            echo "ZalithLauncher folder not found!"
+            exit 1
+          fi
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add -A
+          git commit -m "Cleanup repo and rename ZalithLauncher to kslauncher"
+          git push
